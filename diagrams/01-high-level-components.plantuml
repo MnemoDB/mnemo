@@ -1,0 +1,64 @@
+@startuml
+title Mnemo — High-Level Components (Layers)
+
+skinparam componentStyle rectangle
+skinparam shadowing false
+skinparam dpi 140
+
+package "Clients" #DDDDDD {
+  [redis-cli / apps]
+}
+
+package "Mnemo Server" {
+  [Net/Protocol\n(tokio + RESP3)] as Net
+  [Dispatcher\n(Command Router)] as Disp
+  [Command Runtime\n(Registry + Flags + ArgParser)] as Cmd
+  [Shards (N)\nSingle-Writer Event Loops] as Shards
+  [Admin\n(INFO/CONFIG/MONITOR/Slowlog/metrics)] as Admin
+  [Scripting\n(Lua/JS Sandbox)] as Script
+  [Replication\n(PSYNC2 + Backlog)] as Repl
+  [Cluster\n(Slots/Gossip/Migrate)] as Cluster
+  [Persistence\n(RDB/AOF + Rewrite)] as Persist
+
+  package "Subsystems (Redis Stack)" {
+    [JSONDoc\n(JSON.*)] as JSONM
+    [Search/Index\n(FT.* + BM25)] as Search
+    [Vector Index\n(HNSW KNN)] as Vector
+    [TimeSeries\n(TS.*)] as TS
+    [Probabilistic\n(Bloom/CF/TopK/CM)] as Prob
+  }
+
+  package "Core Keyspace" {
+    [Keyspace API\n(get/set/expire/scan)] as KSAPI
+    [Types & Encodings\n(String/List/Hash/Set/ZSet/Stream/...)] as Types
+    [TTL & Eviction\n(timing wheel + LFU)] as TTL
+    [Memory Mgmt\n(Arenas/Jemalloc)] as Mem
+  }
+}
+
+[redis-cli / apps] --> Net : RESP3\n(pipelining)
+
+Net --> Disp
+Disp --> Cmd
+Cmd --> Shards
+Shards --> KSAPI
+KSAPI -down-> Types
+KSAPI -down-> TTL
+KSAPI -down-> Mem
+
+' Write-path hooks
+Shards ..> Persist : change log\n(AOF/RDB)
+Shards ..> Repl    : replication offsets\n& backlog
+Shards ..> JSONM   : index/update hooks
+Shards ..> Search  : index/update hooks
+Shards ..> Vector  : index/update hooks
+Shards ..> TS      : append/compaction
+Shards ..> Prob    : mutate structures
+
+Disp ..> Admin
+Disp ..> Script
+Disp ..> Cluster
+
+Repl ..> Persist : stream AOF\non full sync
+
+@enduml

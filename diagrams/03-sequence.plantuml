@@ -1,0 +1,25 @@
+@startuml
+title Mnemo — Sequence: SET with TTL
+
+actor Client
+participant "Net/Protocol" as Net
+participant "Dispatcher" as Disp
+participant "Shard (owner of slot)" as Shard
+participant "Keyspace" as KS
+participant "TTL Table" as TTL
+participant "AOF Appender" as AOF
+
+Client -> Net : RESP3 Array\n["SET","k","v","EX","10"]
+Net -> Disp : Frame
+Disp -> Shard : route(slot(k)), enqueue
+activate Shard
+Shard -> KS : set(k, v)
+Shard -> TTL : set_expiry(k, now+10s)
+Shard -> AOF : append(`SET k v` + `EXPIRE k 10`)
+AOF --> Shard : ack (buffered per policy)
+Shard --> Disp : OK
+deactivate Shard
+Disp --> Net : +OK
+Net --> Client : +OK
+
+@enduml

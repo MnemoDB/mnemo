@@ -1,0 +1,45 @@
+@startuml
+title Mnemo — Runtime Threads & Queues
+
+skinparam shadowing false
+skinparam dpi 140
+
+rectangle "OS" {
+  node "Mnemo Process" {
+    frame "Tokio Runtime" {
+      [Acceptor] as Acceptor
+      [Conn I/O Tasks] as IO
+      [Backpressure & Limits] as BP
+
+      package "Shard Executors (N)" {
+        [Shard#1\n(single-writer loop)] as S1
+        [Shard#2\n(single-writer loop)] as S2
+        [Shard#...]
+      }
+
+      package "Background Workers" {
+        [AOF Appender] as AOFW
+        [AOF Rewriter] as AOFWR
+        [RDB Snapshotter] as RDBW
+        [Expiry Sweeper] as EXPW
+        [Index Builders] as IDXW
+        [TS Compactor] as TSCW
+        [Gossip/Cluster] as CLUW
+      }
+    }
+  }
+}
+
+Acceptor --> IO : new TCP conn
+IO --> BP : framed RESP3\n(pipelines)
+BP --> S1 : route by key slot\n(mpsc)
+BP --> S2 : route by key slot\n(mpsc)
+S1 --> AOFW : change log batches
+AOFW --> AOFWR : rewrite trigger
+S1 --> RDBW : snapshot signal
+S1 --> IDXW : doc/index updates
+S1 --> EXPW : schedule expirations
+S1 --> TSCW : TS rules/rollups
+CLUW <..> S1 : gossip/slots/migrate
+
+@enduml

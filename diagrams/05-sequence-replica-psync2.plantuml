@@ -1,0 +1,23 @@
+@startuml
+title Mnemo — Sequence: Replication Partial Resync
+
+participant "Replica" as R
+participant "Primary" as P
+participant "Backlog" as B
+participant "AOF Stream" as A
+
+R -> P : PSYNC <replid> <offset=O>
+P -> B : check window(O)
+alt O in backlog
+  B --> P : ok, start from O
+  P -> R : +CONTINUE
+  P -> A : stream deltas from O
+  A --> R : AOF tail
+else O too old
+  P -> R : +FULLRESYNC (replid, newOffset)
+  P -> R : RDB snapshot
+  P -> A : live AOF stream after RDB
+  A --> R : follow live
+end
+
+@enduml

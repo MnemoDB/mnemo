@@ -1,0 +1,23 @@
+@startuml
+title Mnemo — Sequence: FT.SEARCH with KNN
+
+actor Client
+participant Net
+participant Disp
+participant "Search Planner" as Planner
+participant "Index Segments" as Segs
+participant "Vector HNSW" as HNSW
+participant "Keyspace" as KS
+
+Client -> Net : RESP3\nFT.SEARCH idx \"query\" KNN 10 @vec $qvec
+Net -> Disp : Frame
+Disp -> Planner : parse & plan
+Planner -> Segs : fetch term postings\n& filters
+Planner -> HNSW : knn(qvec, topK, efSearch)
+HNSW --> Planner : candidate ids + scores
+Planner -> KS : apply filters, fetch fields\n(sort/limit)
+Planner --> Disp : result rows
+Disp --> Net : Array(rows)
+Net --> Client : results
+
+@enduml
