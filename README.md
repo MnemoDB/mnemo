@@ -1,5 +1,9 @@
 # Mnemo
 
+<p align="center">
+  <img src="MnemoLogo.png" alt="Mnemo Logo" width="200"/>
+</p>
+
 **Mnemo** is a rich in-memory database written in Rust, fully compatible with
 the Redis protocol (RESP3) and designed to extend beyond Redis OSS with the
 entire Redis Stack feature set — including JSON, Search, TimeSeries, Bloom
